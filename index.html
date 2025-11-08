@@ -139,7 +139,8 @@
 
 	// Helpers
 	const $ = s => document.querySelector(s);
-	function fmt(n, d=2){ return (n==null || isNaN(+n)) ? '—' : (+n).toFixed(d); }
+        function fmt(n, d=2){ return (n==null || isNaN(+n)) ? '—' : (+n).toFixed(d); }
+        function fmtCurrency(n, currency='BDT'){ return (n==null || isNaN(+n)) ? '—' : `${currency} ${(+n).toFixed(2)}`; }
 
 
 
@@ -288,18 +289,27 @@
 	}
 
 	// Tables
-	function loadDaily(){
-		fetch(`daily.php?device_id=${dev}`).then(r=>r.json()).then(data=>{
-			const tb = document.querySelector('#daily tbody');
-			tb.innerHTML = (data.rows||[]).map(r=>`<tr><td style="text-align:left">${r.day}</td><td>${(+r.kwh).toFixed(3)}</td><td>${r.rate_per_kwh?(+r.rate_per_kwh).toFixed(2):'-'}</td><td>${r.cost?(+r.cost).toFixed(2):'-'}</td></tr>`).join('');
-		}).catch(e=>console.warn('loadDaily',e));
-	}
-	function loadMonthly(){
-		fetch(`monthly.php?device_id=${dev}`).then(r=>r.json()).then(data=>{
-			const tb = document.querySelector('#monthly tbody');
-			tb.innerHTML = (data.rows||[]).map(r=>`<tr><td style="text-align:left">${String(r.month_start).slice(0,7)}</td><td>${(+r.kwh).toFixed(3)}</td><td>${r.rate_per_kwh?(+r.rate_per_kwh).toFixed(2):'-'}</td><td>${r.fixed_monthly?(+r.fixed_monthly).toFixed(2):'-'}</td><td>${(+(r.cost||0) + (r.fixed_monthly||0)).toFixed(2)}</td></tr>`).join('');
-		}).catch(e=>console.warn('loadMonthly',e));
-	}
+        function loadDaily(){
+                fetch(`daily.php?device_id=${dev}`).then(r=>r.json()).then(data=>{
+                        const tb = document.querySelector('#daily tbody');
+                        tb.innerHTML = (data.rows||[]).map(r=>{
+                                const rate = r.rate_per_kwh != null ? fmt(r.rate_per_kwh, 2) : '—';
+                                const cost = fmtCurrency(r.cost, r.currency || 'BDT');
+                                return `<tr><td style="text-align:left">${r.day}</td><td>${fmt(r.kwh,3)}</td><td>${rate}</td><td>${cost}</td></tr>`;
+                        }).join('');
+                }).catch(e=>console.warn('loadDaily',e));
+        }
+        function loadMonthly(){
+                fetch(`monthly.php?device_id=${dev}`).then(r=>r.json()).then(data=>{
+                        const tb = document.querySelector('#monthly tbody');
+                        tb.innerHTML = (data.rows||[]).map(r=>{
+                                const rate = r.rate_per_kwh != null ? fmt(r.rate_per_kwh, 2) : '—';
+                                const fixed = fmtCurrency(r.fixed_cost, r.currency || 'BDT');
+                                const total = fmtCurrency(r.total_cost, r.currency || 'BDT');
+                                return `<tr><td style="text-align:left">${String(r.month_start).slice(0,7)}</td><td>${fmt(r.kwh,3)}</td><td>${rate}</td><td>${fixed}</td><td>${total}</td></tr>`;
+                        }).join('');
+                }).catch(e=>console.warn('loadMonthly',e));
+        }
 
 	// Kickoff & intervals
 	// Load latest immediately so the UI shows current values without waiting for the first interval tick
