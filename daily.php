@@ -8,25 +8,15 @@ if (!$device_id) { http_response_code(400); echo json_encode(['ok'=>false,'err'=
 
 
 $sql = <<<SQL
-WITH per_row AS (
-SELECT r.*, LAG(energy_kwh_current) OVER (PARTITION BY r.device_id ORDER BY r.ts) AS prev_total
-FROM readings r WHERE r.device_id = :device_id
-), daily AS (
-SELECT DATE(ts) AS day,
-GREATEST(SUM(GREATEST(energy_kwh_current - prev_total, 0)), 0) AS kwh
-FROM per_row
-GROUP BY DATE(ts)
-)
-SELECT d.day,
-d.kwh,
-t.rate_per_kwh,
-(d.kwh * t.rate_per_kwh) AS cost
-FROM daily d
-JOIN device_tariff dt ON dt.device_id = :device_id
-JOIN tariffs t ON t.id = dt.tariff_id
-WHERE (t.effective_to IS NULL OR d.day <= t.effective_to)
-AND d.day >= t.effective_from
-ORDER BY d.day DESC
+SELECT `day`,
+       energy_kwh AS kwh,
+       rate_per_kwh,
+       energy_cost AS cost,
+       currency
+FROM daily_usage
+WHERE device_id = :device_id
+ORDER BY `day` DESC
+LIMIT 90
 SQL;
 
 

@@ -28,7 +28,7 @@ SET time_zone = "+00:00";
 --
 
 CREATE TABLE `devices` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `device_id` varchar(64) NOT NULL,
   `api_key` varchar(128) NOT NULL,
   `name` varchar(128) DEFAULT NULL
@@ -66,14 +66,16 @@ INSERT INTO `device_tariff` (`device_id`, `tariff_id`) VALUES
 --
 
 CREATE TABLE `readings` (
-  `id` bigint(20) NOT NULL,
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `device_id` varchar(64) NOT NULL,
   `ts` datetime NOT NULL DEFAULT current_timestamp(),
   `voltage` decimal(10,2) NOT NULL,
   `current_ma` decimal(10,2) NOT NULL,
   `power_w` decimal(10,2) NOT NULL,
   `energy_kwh_current` decimal(16,6) NOT NULL,
-  `energy_kwh_total` decimal(16,6) NOT NULL
+  `energy_kwh_total` decimal(16,6) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_dev_ts` (`device_id`,`ts`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -155,9 +157,47 @@ ALTER TABLE `device_tariff`
 --
 -- Indexes for table `readings`
 --
-ALTER TABLE `readings`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_dev_ts` (`device_id`,`ts`);
+--
+-- Table structure for table `daily_usage`
+--
+
+CREATE TABLE `daily_usage` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `device_id` varchar(64) NOT NULL,
+  `day` date NOT NULL,
+  `tariff_id` int(11) DEFAULT NULL,
+  `rate_per_kwh` decimal(10,4) NOT NULL,
+  `currency` char(3) NOT NULL DEFAULT 'BDT',
+  `energy_kwh` decimal(16,6) NOT NULL DEFAULT 0.000000,
+  `energy_cost` decimal(16,6) NOT NULL DEFAULT 0.000000,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_daily_device_day` (`device_id`,`day`),
+  KEY `idx_daily_device_day` (`device_id`,`day`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Table structure for table `monthly_usage`
+--
+
+CREATE TABLE `monthly_usage` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `device_id` varchar(64) NOT NULL,
+  `month` date NOT NULL,
+  `tariff_id` int(11) DEFAULT NULL,
+  `rate_per_kwh` decimal(10,4) NOT NULL,
+  `fixed_monthly` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `currency` char(3) NOT NULL DEFAULT 'BDT',
+  `energy_kwh` decimal(16,6) NOT NULL DEFAULT 0.000000,
+  `energy_cost_variable` decimal(16,6) NOT NULL DEFAULT 0.000000,
+  `fixed_charge_applied` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_monthly_device_month` (`device_id`,`month`),
+  KEY `idx_monthly_device_month` (`device_id`,`month`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Indexes for table `tariffs`
@@ -179,7 +219,19 @@ ALTER TABLE `devices`
 -- AUTO_INCREMENT for table `readings`
 --
 ALTER TABLE `readings`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2037;
+  MODIFY `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2037;
+
+--
+-- AUTO_INCREMENT for table `daily_usage`
+--
+ALTER TABLE `daily_usage`
+  MODIFY `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `monthly_usage`
+--
+ALTER TABLE `monthly_usage`
+  MODIFY `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tariffs`
@@ -203,6 +255,20 @@ ALTER TABLE `device_tariff`
 --
 ALTER TABLE `readings`
   ADD CONSTRAINT `readings_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `devices` (`device_id`);
+
+--
+-- Constraints for table `daily_usage`
+--
+ALTER TABLE `daily_usage`
+  ADD CONSTRAINT `daily_usage_device_fk` FOREIGN KEY (`device_id`) REFERENCES `devices` (`device_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `daily_usage_tariff_fk` FOREIGN KEY (`tariff_id`) REFERENCES `tariffs` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Constraints for table `monthly_usage`
+--
+ALTER TABLE `monthly_usage`
+  ADD CONSTRAINT `monthly_usage_device_fk` FOREIGN KEY (`device_id`) REFERENCES `devices` (`device_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  ADD CONSTRAINT `monthly_usage_tariff_fk` FOREIGN KEY (`tariff_id`) REFERENCES `tariffs` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
