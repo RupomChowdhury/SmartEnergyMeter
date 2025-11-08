@@ -7,8 +7,8 @@
 #include <ZMPT101B.h>
 #include <EEPROM.h>
 
-char ssid[] = "SixT9";
-char pass[] = "wifi.rupom.dev";
+char ssid[] = "";
+char pass[] = "";
 
 ACS712   ACS(34, 3.3, 4096, 66);
 ZMPT101B voltageSensor(35, 50.0);
