@@ -16,7 +16,6 @@ ZMPT101B voltageSensor(35, 50.0);
 float unit;                 
 int   volt, current, power; 
 
-// ===== EEPROM =====
 #define EEPROM_SIZE   512
 #define UNIT_ADDRESS  0
 
@@ -24,7 +23,7 @@ const char* API_URL   = "http://192.168.1.100/meter/ingest.php";
 const char* DEVICE_ID = "esp32meter";               
 const char* API_KEY   = "LUb0FTb+UjvgGSuyXZDBU+lBy2Y9Ixdc8a+KZqZ9taA=";      
 
-const unsigned long SEND_INTERVAL_MS = 1000; // 1 seconds
+const unsigned long SEND_INTERVAL_MS = 1000;
 unsigned long lastSend = 0;
 
 void connectWiFi() {
@@ -38,7 +37,7 @@ void connectWiFi() {
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print('.');
     delay(500);
-    if (millis() - start > 20000) break; // 20s timeout
+    if (millis() - start > 20000) break; 
   }
   Serial.println();
 
@@ -50,11 +49,10 @@ void connectWiFi() {
   }
 }
 
-// ---------- POST to backend ----------
 void maybeSendToServer(float voltage, float mA, float watt, float kWhTotal) {
   if (WiFi.status() != WL_CONNECTED) {
     connectWiFi();
-    if (WiFi.status() != WL_CONNECTED) return; // still offline, skip this round
+    if (WiFi.status() != WL_CONNECTED) return;
   }
 
   if (millis() - lastSend < SEND_INTERVAL_MS) return;
@@ -64,7 +62,6 @@ void maybeSendToServer(float voltage, float mA, float watt, float kWhTotal) {
   http.begin(API_URL);
   http.addHeader("Content-Type", "application/json");
 
-  // Build JSON (keep simple; no external libs)
   String payload = "{";
   payload += "\"device_id\":\"" + String(DEVICE_ID) + "\",";
   payload += "\"api_key\":\""   + String(API_KEY)   + "\",";
@@ -86,11 +83,9 @@ void maybeSendToServer(float voltage, float mA, float watt, float kWhTotal) {
   http.end();
 }
 
-// ================== Arduino lifecycle ==================
 void setup() {
   Serial.begin(115200);
 
-  // EEPROM
   EEPROM.begin(EEPROM_SIZE);
   unit = EEPROM.readFloat(UNIT_ADDRESS);
   if (isnan(unit)) unit = 0.0;
@@ -98,7 +93,6 @@ void setup() {
   Serial.print("Previous Unit Value: ");
   Serial.println(unit);
 
-  // ACS712 info (as in your code)
   Serial.print("ACS712_LIB_VERSION: ");
   Serial.println(ACS712_LIB_VERSION);
 
@@ -108,7 +102,6 @@ void setup() {
   Serial.print("Noise mV: ");
   Serial.println(ACS.getNoisemV());
 
-  // ZMPT sensitivity (same as yours)
   voltageSensor.setSensitivity(500.0f);
 
   delay(1000);
@@ -151,7 +144,6 @@ void loop() {
 
   delay(500);
 
-  // Persist running kWh
   EEPROM.writeFloat(UNIT_ADDRESS, unit);
   EEPROM.commit();
 
