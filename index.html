@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Smart Energy Dashboard (Live)</title>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<style>
+		:root{
+			--bg:#0f1724; /* deep slate */
+			--card:#0b1220;
+			--muted:#94a3b8;
+			--accent:#06b6d4; /* cyan */
+			--glass: rgba(255,255,255,0.03);
+			--radius:14px;
+		}
+
+		html,body{height:100%;}
+		body{
+			margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+			background: linear-gradient(180deg, rgba(6,6,23,0.6), rgba(2,6,23,0.85)), var(--bg);
+			color: #e6eef8; -webkit-font-smoothing:antialiased;
+			max-width:1200px; margin:20px auto; padding:18px; box-sizing:border-box;
+		}
+		header{display:flex;align-items:center;gap:12px;justify-content:space-between}
+		header h1{font-size:20px;margin:0}
+		.controls{display:flex;gap:8px;align-items:center}
+		.btn{background:var(--accent);color:#042027;border:none;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+		.container{display:grid;grid-template-columns:1fr;gap:16px;margin-top:14px}
+
+		.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+		.card{background:linear-gradient(180deg,var(--card),rgba(0,0,0,0.05));padding:14px;border-radius:var(--radius);box-shadow:0 6px 18px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
+		.label{color:var(--muted);font-size:12px}
+		.value{font-size:24px;font-weight:700;margin-top:6px}
+
+		/* charts grid */
+		.charts{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+		.chart-card{padding:12px;border-radius:var(--radius);background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));}
+		canvas{width:100%!important;aspect-ratio: 16/7;max-height:420px;border-radius:8px}
+		/* mini textual recent-values in stat tiles */
+		.miniVals{min-width:110px;color:var(--muted);font-size:13px;flex:0 0 110px;text-align:left}
+
+		/* pulse on update */
+		.pulse{animation:pulse 700ms ease-in-out}
+		@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.04)}100%{transform:scale(1)}}
+
+		/* tables */
+		h2{font-size:16px;margin:8px 0 10px 0;color:#dff3fb}
+		.table-wrap{background:var(--glass);padding:10px;border-radius:12px;overflow:auto}
+		table{width:100%;border-collapse:collapse;color:inherit}
+		th,td{padding:10px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.04)}
+		th{font-weight:700;text-align:left;color:var(--muted);font-size:13px}
+		tr:nth-child(even) td{background:transparent}
+
+		/* responsive */
+		@media (max-width:1000px){ .charts{grid-template-columns:1fr} .stats{grid-template-columns:repeat(2,1fr)} }
+		@media (max-width:620px){
+			.stats{grid-template-columns:1fr}
+			header{flex-direction:column;align-items:flex-start;gap:8px}
+			.controls{width:100%;justify-content:space-between}
+		}
+
+		/* Small touches */
+		.muted{color:var(--muted);font-size:13px}
+	</style>
+</head>
+<body>
+	<header>
+		<div>
+			<h1>Smart Energy Dashboard <span class="muted">(Live)</span></h1>
+			<div class="muted">Device: <strong id="deviceId" style="color:var(--accent)">esp32meter</strong></div>
+		</div>
+			<div class="controls">
+				<button class="btn" id="refreshBtn">Refresh</button>
+			</div>
+	</header>
+
+	<main class="container">
+			<section class="stats">
+				<div class="card">
+					<div class="label">Voltage (V)</div>
+					<div style="display:flex;align-items:center;gap:12px">
+						<div class="value" id="vV">—</div>
+						<div class="miniVals" id="sV">—</div>
+					</div>
+				</div>
+				<div class="card">
+					<div class="label">Current (mA)</div>
+					<div style="display:flex;align-items:center;gap:12px">
+						<div class="value" id="vI">—</div>
+						<div class="miniVals" id="sI">—</div>
+					</div>
+				</div>
+				<div class="card">
+					<div class="label">Power (W)</div>
+					<div style="display:flex;align-items:center;gap:12px">
+						<div class="value" id="vP">—</div>
+						<div class="miniVals" id="sP">—</div>
+					</div>
+				</div>
+				<div class="card">
+					<div class="label">Total Energy (kWh)</div>
+					<div style="display:flex;align-items:center;gap:12px">
+						<div class="value" id="vE">—</div>
+						<!-- <div class="miniVals" id="sE">—</div> -->
+					</div>
+				</div>
+			</section>
+
+		<section class="charts">
+			<div class="card chart-card"><h2>Voltage</h2><canvas id="cVolt"></canvas></div>
+			<div class="card chart-card"><h2>Current</h2><canvas id="cCurr"></canvas></div>
+			<div class="card chart-card"><h2>Power</h2><canvas id="cPow"></canvas></div>
+			<div class="card chart-card"><h2>Energy</h2><canvas id="cEng"></canvas></div>
+		</section>
+
+		<section>
+			<h2>Daily usage & cost</h2>
+			<div class="table-wrap"><table id="daily"><thead><tr><th>Date</th><th>kWh</th><th>Rate</th><th>Cost</th></tr></thead><tbody></tbody></table></div>
+		</section>
+
+		<section>
+			<h2>Monthly usage & cost</h2>
+			<div class="table-wrap"><table id="monthly"><thead><tr><th>Month</th><th>kWh</th><th>Rate</th><th>Fixed</th><th>Cost</th></tr></thead><tbody></tbody></table></div>
+		</section>
+	</main>
+
+	<script>
+	// Config
+	const dev = 'esp32meter'; // <-- your device id
+	document.getElementById('deviceId').textContent = dev;
+	const minutesWindow = 60; // show last 60 minutes
+	const pollLiveMs = 1500; // poll latest every 1.5s
+	const pollHistoryMs = 5000; // refresh history less often
+
+	// How many points to show on charts at most. Adjust if you want a larger or smaller window.
+	// Default: clamp between 60 and 600 based on minutesWindow to avoid huge/all-time charts.
+	const maxPoints = Math.min(600, Math.max(60, minutesWindow * 2));
+
+	// Helpers
+	const $ = s => document.querySelector(s);
+	function fmt(n, d=2){ return (n==null || isNaN(+n)) ? '—' : (+n).toFixed(d); }
+
+
+
+	// Chart factory
+	function mkChart(ctx,label,color){
+		return new Chart(ctx, {
+			type: 'line',
+			data: { labels: [], datasets: [{ label, data: [], tension: 0.3, pointRadius: 0, borderColor: color || '#06b6d4', backgroundColor: 'rgba(6,182,212,0.06)', fill: true }] },
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				animation: false,
+				scales: { x: { ticks: { maxRotation: 0, autoSkip: true } } },
+				plugins: { legend: { display: false } }
+			}
+		});
+	}
+
+	const chV = mkChart(document.getElementById('cVolt'), 'Voltage','#60a5fa');
+	const chI = mkChart(document.getElementById('cCurr'), 'Current','#7dd3fc');
+	const chP = mkChart(document.getElementById('cPow'), 'Power','#34d399');
+	// Energy (current) chart — uses energy_kwh_current when available
+	const chE = mkChart(document.getElementById('cEng'), 'Energy (current)',' #fca5a5');
+
+			// recent-values textual displays
+			const recentCount = 3; // how many recent numeric values to show next to each stat
+			const recentV = []; // voltage
+			const recentI = []; // current
+			const recentP = []; // power
+			const recentE = []; // energy
+
+			function renderRecent(elId, arr){
+				const el = document.getElementById(elId);
+				if(!el) return;
+				if(arr.length === 0) { el.textContent = '—'; return; }
+				// join with middot separator and show newest first
+				el.textContent = arr.slice().reverse().map(v=>v).join(' · ');
+			}
+
+	// Live tiles
+	let latestController = null;
+	async function loadLatest(){
+		try{
+			// abort previous pending latest request to keep UI responsive
+			if(latestController){ try{ latestController.abort(); }catch(e){} }
+			latestController = new AbortController();
+			const r = await fetch(`latest.php?device_id=${dev}`, { cache: 'no-store', signal: latestController.signal });
+			const j = await r.json();
+			if (!j.ok || !j.row) return;
+			const { ts, voltage, current_ma, power_w, energy_kwh_total } = j.row;
+			// update tiles with a small pulse to indicate fresh data
+			const elV = document.getElementById('vV'); elV.textContent = fmt(voltage,0); elV.classList.add('pulse'); setTimeout(()=>elV.classList.remove('pulse'),800);
+			const elI = document.getElementById('vI'); elI.textContent = fmt(current_ma,0); elI.classList.add('pulse'); setTimeout(()=>elI.classList.remove('pulse'),800);
+			const elP = document.getElementById('vP'); elP.textContent = fmt(power_w,0); elP.classList.add('pulse'); setTimeout(()=>elP.classList.remove('pulse'),800);
+			const elE = document.getElementById('vE'); elE.textContent = fmt(energy_kwh_total,4); elE.classList.add('pulse'); setTimeout(()=>elE.classList.remove('pulse'),800);
+
+					function push(chart, x, y){
+						chart.data.labels.push(x);
+						chart.data.datasets[0].data.push(y);
+						// Trim to the last maxPoints values to avoid showing all-time history
+						if (chart.data.labels.length > maxPoints){ chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+						chart.update('none');
+					}
+			const t = new Date(ts).toLocaleTimeString();
+					push(chV, t, +voltage);
+					push(chI, t, +current_ma);
+					push(chP, t, +power_w);
+					// push current energy reading to the energy (current) chart
+					// ONLY use energy_kwh_current for the chart; do not fallback to total
+					if (typeof j.row.energy_kwh_current !== 'undefined'){
+						push(chE, t, +j.row.energy_kwh_current);
+					}
+							// update recent textual lists (keep last recentCount values)
+							function pushRecent(arr, value){
+								// skip empty/placeholder or NaN-like strings
+								if (value == null) return;
+								if (typeof value === 'string'){
+									const s = value.trim();
+									if (s === '—' || s.toLowerCase() === 'nan') return;
+								}
+								arr.push(value);
+								if(arr.length > recentCount) arr.shift();
+							}
+							pushRecent(recentV, fmt(voltage, (voltage%1===0)?0:2));
+							pushRecent(recentI, fmt(current_ma,0));
+							pushRecent(recentP, fmt(power_w,0));
+							// Only push total energy if numeric
+							if (energy_kwh_total != null && isFinite(+energy_kwh_total)) pushRecent(recentE, (+energy_kwh_total).toFixed(4));
+							renderRecent('sV', recentV);
+							renderRecent('sI', recentI);
+							renderRecent('sP', recentP);
+							renderRecent('sE', recentE);
+		}catch(e){ console.warn('loadLatest', e); }
+	}
+
+	// Historical window
+	async function loadHistory(){
+		try{
+			const r = await fetch(`history.php?device_id=${dev}&minutes=${minutesWindow}`, { cache: 'no-store' });
+			const j = await r.json();
+			if (!j.ok) return;
+			const L = j.rows || [];
+			const labels = L.map(x => new Date(x.ts).toLocaleTimeString());
+			const volts = L.map(x => +x.voltage);
+			const currs = L.map(x => +x.current_ma);
+			const powers = L.map(x => +x.power_w);
+			// Build separate arrays:
+			// - energyCurrentRows / energy: rows that include energy_kwh_current (used only for the energy chart)
+			// - energyTotals: energy_kwh_total values used only for the top numeric recent-values
+			const energyCurrentRows = L.filter(x => typeof x.energy_kwh_current !== 'undefined');
+			const energy = energyCurrentRows.map(x => +x.energy_kwh_current);
+			const energyLabels = energyCurrentRows.map(x => new Date(x.ts).toLocaleTimeString());
+			const energyTotals = L.map(x => +x.energy_kwh_total);
+							function setSeries(ch, lbls, vals){
+								// Only keep the most recent maxPoints values when replacing the series
+								ch.data.labels = lbls.slice(-maxPoints);
+								ch.data.datasets[0].data = vals.slice(-maxPoints);
+								ch.update();
+							}
+			setSeries(chV, labels, volts);
+			setSeries(chI, labels, currs);
+			setSeries(chP, labels, powers);
+			// Set energy (current) series only if we have energy_kwh_current rows
+			if (energy.length > 0) setSeries(chE, energyLabels, energy);
+			else setSeries(chE, [], []);
+							// populate recent textual lists with last recentCount values
+							function setRecentFromArray(arrSource, destArr, fmtFn){
+								destArr.length = 0; // clear
+								const tail = arrSource.slice(-recentCount);
+								for(const v of tail){
+									const n = Number(v);
+									if (!isFinite(n)) continue; // skip NaN/invalid values
+									destArr.push(fmtFn? fmtFn(v) : (''+v));
+								}
+							}
+							setRecentFromArray(volts, recentV, v=> (Math.round(v*100)/100).toFixed((v%1===0)?0:2));
+							setRecentFromArray(currs, recentI, v=> Math.round(v).toString());
+							setRecentFromArray(powers, recentP, v=> Math.round(v).toString());
+							// recent values for the top Energy tile should come from energy_kwh_total (totals)
+							setRecentFromArray(energyTotals, recentE, v=> (Math.round( Number(v) * 10000)/10000).toFixed(4));
+							renderRecent('sV', recentV);
+							renderRecent('sI', recentI);
+							renderRecent('sP', recentP);
+							renderRecent('sE', recentE);
+		}catch(e){ console.warn('loadHistory', e); }
+	}
+
+	// Tables
+	function loadDaily(){
+		fetch(`daily.php?device_id=${dev}`).then(r=>r.json()).then(data=>{
+			const tb = document.querySelector('#daily tbody');
+			tb.innerHTML = (data.rows||[]).map(r=>`<tr><td style="text-align:left">${r.day}</td><td>${(+r.kwh).toFixed(3)}</td><td>${r.rate_per_kwh?(+r.rate_per_kwh).toFixed(2):'-'}</td><td>${r.cost?(+r.cost).toFixed(2):'-'}</td></tr>`).join('');
+		}).catch(e=>console.warn('loadDaily',e));
+	}
+	function loadMonthly(){
+		fetch(`monthly.php?device_id=${dev}`).then(r=>r.json()).then(data=>{
+			const tb = document.querySelector('#monthly tbody');
+			tb.innerHTML = (data.rows||[]).map(r=>`<tr><td style="text-align:left">${String(r.month_start).slice(0,7)}</td><td>${(+r.kwh).toFixed(3)}</td><td>${r.rate_per_kwh?(+r.rate_per_kwh).toFixed(2):'-'}</td><td>${r.fixed_monthly?(+r.fixed_monthly).toFixed(2):'-'}</td><td>${(+(r.cost||0) + (r.fixed_monthly||0)).toFixed(2)}</td></tr>`).join('');
+		}).catch(e=>console.warn('loadMonthly',e));
+	}
+
+	// Kickoff & intervals
+	// Load latest immediately so the UI shows current values without waiting for the first interval tick
+	loadLatest();
+	loadHistory(); loadDaily(); loadMonthly();
+	setInterval(loadLatest, pollLiveMs);
+	setInterval(loadHistory, pollHistoryMs);
+	setInterval(loadDaily, 30000);
+	setInterval(loadMonthly, 60000);
+
+	// refresh button
+	document.getElementById('refreshBtn').addEventListener('click', ()=>{ loadLatest(); loadHistory(); loadDaily(); loadMonthly(); });
+
+
+
+
+	</script>
+</body>
+</html>
